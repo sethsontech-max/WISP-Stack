@@ -4,6 +4,7 @@ networks:
 volumes:
   prometheus_storage: {}
   grafana_storage: {}
+  loki_storage: {}
 
 services:
   mktxp:
@@ -47,6 +48,7 @@ services:
     restart: unless-stopped
     volumes:
     - ./loki/loki-config.yml:/etc/loki/loki-config.yml
+    - loki_storage:/loki/storage
 
   prometheus:
     command:

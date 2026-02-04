@@ -1,132 +1,143 @@
-![License](https://img.shields.io/badge/License-GNU%20GPL-blue.svg)
-![Language](https://img.shields.io/badge/docker-%230db7ed.svg)
-![License](https://img.shields.io/badge/mikrotik-routeros-orange)
-![License](https://img.shields.io/badge/prometheus-exporter-blueviolet)
+### Under Construction
+#### To Dos
+1. Update documentation and git
+    1. Document device IPs/target files and methods
+1. Add AF60 MicroTower Airtime graphs to main dashboard
+1. declare main/default grafana dashboard as nemo Dashboard
+1. modify and clean up ubiquiti drilldown dashboard
+1. add logging to all docker containers
+1. fix Nemo Dashboard Waning log / device panel - currently shows incorrect values
+1. create Container log dashboard
+1. Add web based file editor container - provide means of adjusting targets easily with documentation
+    1. code-server - VS code web browser is probably best option
+1. setup basic authentication checks - password logins - to prevent unwanted edits
+1. determine backup and transfer method
+    1. Move stack to linux machine for more hardware resource
+1. investigate ways to have high avialability setup include mirrors of volume data storage
+
+
+#### Possible Future Imporvments
+1. add unifi snmp data to track unifi UPS and cameras offline status (more future improvement and needed)
+1. send all ubiquiti device logs to server
+    1. add local DNS name to router to point in case IP address changes
+1. Create program to perfrom IP scan and compare against all targets - allows for checking if unmonitored devices are present when compared to target list. As well as ping status of devices.
+1. Reduce SNMP metrics for Mikrotik devices as they are not needed with API metrics. SNMP is only needed for easy UP status indicator for grafana
+1. implement parrallel target processing for faster scraping time
 
 ### Description
-MKTXP-Stack is a dockerized monitoring stack for [MKTXP Exporter](https://github.com/akpw/mktxp). 
+This is a customized docker stack based on [MKTXP-Stack](https://github.com/akpw/mktxp-stack) designed for data collection and logging of network elements, primarily Ubiquiti AirMax/AF60 and MikroTik RouterOS devices. The primary use is for managing WISP deployment with vizualizations and dashboards not available in existing tools.
 
-As an out-of-the-box solution, it lets you quickly get up & running with [MKTXP](https://github.com/akpw/mktxp), [Prometheus](https://prometheus.io/), and [Grafana](https://grafana.com/) and have multiple Mikrotik RouterOS devices monitored with least amount of configuration. 
+Primary functions are quick view of total throughput, APs airtime is exceeding thresholds, any station who have changed ssid values, as well as dashboards for viewing indepth per device metrics (regardless of manufacturer) and logs.
 
-While complementary to [MKTXP](https://github.com/akpw/mktxp), this project also adds some extra capabilities such an [centralized Mikrotik log processing](https://github.com/akpw/mktxp-stack#mikrotik-centralized-logging-configuration) based on a preconfigured  [syslog-ng](https://www.syslog-ng.com/) / [promtail](https://grafana.com/docs/loki/latest/clients/promtail/) / [Loki](https://grafana.com/docs/loki/latest) stack. 
+The current dashboards are heavily customized for our specific setup. Significant adjustments will need to be made to be used for other configurations.
 
-The project offers multiple [docker compose configurations](https://github.com/akpw/mktxp-stack/blob/main/README.md#alternative-docker-compose-configurations), for loading only relevant parts of the stack as well as for multiple log management options.
+#### Included Programs and their use
+* [Grafana](https://github.com/grafana/grafana) - Data visualization and dashboard platform
+* [Prometheus](https://github.com/prometheus/prometheus) - Time series database and monitoring system
+  * [SNMP-Exporter](https://github.com/prometheus/snmp_exporter) - Scrapes SNMP data from network devices
+    * [SNMP Generator](https://github.com/prometheus/snmp_exporter/tree/main/generator) - Creates SNMP MIB/OID mapping files based on devices and manufacturers to be monitored
+  * [MKTXP](https://github.com/akpw/mktxp) - MikroTik Exporter: uses RouterOS API to gather device metrics and statistics
+* [Loki](https://github.com/grafana/loki) - Log aggregation system designed for storing and querying logs
+  * [Promtail](https://github.com/grafana/loki/tree/main/clients/promtail) - Log shipping agent that collects and forwards logs to Loki
+  * [syslog-ng](https://github.com/syslog-ng/syslog-ng) - Advanced syslog daemon for collecting, processing, and forwarding log messages from network devices
+* SSID-change-detector - A custom Docker container designed to detect when Ubiquiti AirMax stations switch to their designated backup or secondary SSID connection. 
 
+##### SSID-Change-Detector Description
+
+A custom Docker container designed to detect when Ubiquiti AirMax stations switch to their designated backup or secondary SSID connection. This is useful notification for determing soft failures and manually reverting the station back to the primary connection. Unfortunately, I was unable to determine a different method to perform this function using existing tools.
+
+The container is based on Alpine Linux and queries Prometheus to monitor changes in the "ubntWlStatSsid" label over time. It compares the current value against its value from a previous interval (configurable via `LOOKBACK_INTERVAL`, default: 300s). When a change is detected, it logs the event. The Loki Docker plugin pushes these logs to Loki for visualization in Grafana.
+
+### File Setup and Targets
+
+#### SNMP Devices
+To adjust or change which devices (called targets) are monitored or scraped, modify the appropriate YAML configuration files.
+
+For devices using SNMP data, targets are declared in YAML files organized by device type, located in:
+```
+Prometheus
+└── Targets
+    ├── mikrotik_routeros_targets.yml
+    ├── ubiquiti_af60_targets.yml
+    ├── ubiquiti_airfiber_targets.yml
+    ├── ubiquiti_airmax_targets.yml
+    ├── Ubiquiti_UISP_P_targets.yml
+    └── Ubiquiti_UISP_S_targets.yml
+```
+
+Place device IPs in the YAML file associated with the device type based on the filename. Targets will automatically update after a few minutes without intervention.
+
+#### Example Configuration:
+You can define multiple target groups within each file to assign custom labels per device. This is useful for filtering devices in Grafana queries. For example, the AirMax YAML file contains multiple target groups with the role label of "ColdSpares"`, `"Infrastructure-Maintenance"`, `"Cancelled-unrecovered"`, or `"misc"`. This allows devices that don't need active monitoring to be excluded from Grafana dashboard queries.
+
+```
+- targets:
+  - 10.10.10.37
+  - 10.10.10.38
+  labels:
+    site: "Sass"
+    device_type: "AF60"
+    link_type: "backhaul"
+
+- targets:
+  - 10.10.10.39
+  - 10.10.10.40
+  labels:
+    site: "WaterTower"
+    device_type: "AF60"
+    link_type: "backhaul"
+```
+#### MikroTik Devices
+
+For MikroTik devices using the API targets need to be declared in mktxp/mktxp.conf. Please see the [mktxp docs](https://github.com/akpw/mktxp) for format rules and options.
+
+In this case, Mikrotik devices main metrics are being called by the API. But they are also listed in the SNMP targets. This is to allow easier determination of device up/down status in grafana as the mktxp exporter does not have a builtin implementation of this.
 
 ### Requirements:
-[Docker Compose](https://docs.docker.com/compose/install/)
+1. [Docker](https://docs.docker.com)
+1. [Docker Compose](https://docs.docker.com/compose/install/)
+1. [Docker Loki plugin](https://grafana.com/docs/loki/latest/send-data/docker-driver/configuration/)
+1. The host machine must have direct IPv4 access to monitored devices. Ideally, host is in same LAN.
+
 
 
 ### Install & Getting Started:
  - Clone this repository (or download zip with wget)
 ```
-git clone https://github.com/akpw/mktxp-stack.git
+git clone [insert URL]
 cd mktxp-stack
 ```
+- setup Loki plugin
 
-#### MKTXP Exporter configuration
-- Following the steps described in [MKTXP Getting Started](https://github.com/akpw/mktxp#getting-started), let's:\
-  a) edit the main mktxp config file, adding your Mikrotik device IP address & authentication info to provided sample entry:
-  ```
-  nano mktxp/mktxp.conf
-  ```
+for amd64 (linux)
 
-  b) if needed, [add a dedicated API user](https://github.com/akpw/mktxp#mikrotik-device-config) from the mktxp config to your RouterOS device:
-  ```
-  /user group add name=mktxp_group policy=api,read
-  /user add name=mktxp_user group=mktxp_group password=mktxp_user_password
-  ```
-
-With that out the of way, things should be ready for running `docker compose`:
 ```
-docker compose -f ./docker-compose-mktxp-stack.yml up -d
+docker plugin install grafana/loki-docker-driver:3.6.0-amd64 --alias loki --grant-all-permissions
 ```
 
-Now give the containers some time to start up, and then point a Web browser to [Grafana](http://localhost:3000). You should see the default [MKTXP Exporter Dashboard](https://grafana.com/grafana/dashboards/13679-mikrotik-mktxp-exporter/):\
-<img width="32%" alt="1" src="https://user-images.githubusercontent.com/5028474/211141785-3d71df65-28cb-45fa-bd22-70022f40f162.png"> <img width="32%" alt="2" src="https://user-images.githubusercontent.com/5028474/211141871-30b409fe-5c77-4616-9cc6-c0556432cfea.png"> <img width="32%" alt="3" src="https://user-images.githubusercontent.com/5028474/211141793-61bee869-9125-4b74-a5b4-a02f0f82cc6d.png">
-
-&nbsp;
-#### Mikrotik Centralized Logging configuration
-In addition to RouterOS devices monitoring, MKTXP-Stack provides a preconfigured  [syslog-ng](https://www.syslog-ng.com/) / [promtail](https://grafana.com/docs/loki/latest/clients/promtail/) / [Loki](https://grafana.com/docs/loki/latest) stack to receieve & process logs from multiple Mikrotik RouterOS devices in a centralized location:
-
-<img width="96%" alt="loki" src="https://user-images.githubusercontent.com/5028474/210771516-06a3e6ab-8eab-458c-9f38-5d44f95d23d4.png">
-
-To make this work, we need to configure our Mikrotik devices to send their logs to a specified log server target. Let's first configure the corresponding remote logging action (replace XX.XX.XX.XX with your docker compose host IP address):
+for arm64 (raspberry Pi)
 ```
-/system logging action
-set remote bsd-syslog=yes name=remote remote=XX.XX.XX.XX remote-port=514 src-address=0.0.0.0 syslog-facility=local0 syslog-severity=auto target=remote
+docker plugin install grafana/loki-docker-driver:3.6.0-arm64 --alias loki --grant-all-permissions
 ```
-Next, let's modify relevant log topics to use with this remote action:
+verify working with
 ```
-/system logging
-set 0 action=remote prefix=:Info
-set 1 action=remote prefix=:Error
-set 2 action=remote prefix=:Warning
-set 3 action=remote prefix=:Critical
-
-add action=remote disabled=no prefix=:Firewall topics=firewall
-add action=remote disabled=no prefix=:Account topics=account
-add action=remote disabled=no prefix=:Caps topics=caps
-add action=remote disabled=no prefix=:Wireles topics=wireless
-```
-You can extend the list above as needed, following [Mikrotik's description](https://help.mikrotik.com/docs/display/ROS/Log) of the log topics used by various RouterOS facilities 
-
-Now all should be ready and, unless you already done so during the previous [MKTXP Exporter configuration](https://github.com/akpw/mktxp-stack#mktxp-exporter-configuration), it's time for `docker compose`:
-```
-docker compose -f ./docker-compose-mktxp-stack.yml up -d
-```
-As soon as the containers are up & running, just point your Web browser to included [Grafana dashboards](http://localhost:3000/dashboards) and open the one called "Mikrotik Loki Logs".
-
-## Alternative docker compose configurations
-The project offers multiple docker compose files, for loading relevant parts of the stack as well as multiple log management options.
-
-### Default stack
-To go with default full stack, just run docker compose as described above:
-```
-docker compose -f ./docker-compose-mktxp-stack.yml up -d
+docker plugin ls
 ```
 
-### File-system based logs
-If you want more control over managing your routers' logs, such a specific file-system location and separate log files:
+start docker compose for the first time using current primary file. We will need to build the custom docker container.
+
 ```
-docker compose -f ./docker-compose-mktxp-stack-fs.yml up -d
+sudo docker-compose -f docker-compose-mktxp-stack-fs.yml up -d --build ssid-change-detector
 ```
 
-This configuration makes it easy to implement log rotation or any additional management functionality on top. By default, the devices' logs will be send to `syslog-ng/logs/` where you can check it out with:
+After building, the stack can be taken up and down with standard docker commands:
 ```
-ls -l syslog-ng/logs/
-```
-💡 *With mktxp-stack up & running, it might take a while for newly added log files to appear in the dashboard. In case this happens, an easy solution is to restart the promtail and syslog containers via `docker restart promtail; docker restart syslog-ng`*
+sudo docker-compose -f docker-compose-mktxp-stack-fs.yml up -d
 
-To set a different location on your mktxp-stack host, just edit the device path in the ```mktxp-stack/docker-compose-mktxp-stack-fs.yml``` configuration:
-```
-volumes:
-  mktxp-logs:
-    driver_opts:
-       o: bind
-       type: none
-       device: $PWD/syslog-ng/logs
+sudo docker-compose -f docker-compose-mktxp-stack-fs.yml down
 ```
 
+### Notes
 
-###  MKTXP Exporter only
-Finally, in case you need just MKTXP Exporter functionality and no logs:
-```
-docker compose -f ./docker-compose-mktxp-stack-no-logs.yml up -d
-```
-
-
-## Overview of components used in this project:
- - [MKTXP Exporter](https://github.com/akpw/mktxp): an open-source Prometheus Exporter for Mikrotik RouterOS devices
- - [Prometheus](https://prometheus.io/): an open-source monitoring & alerting toolkit for cloud / native environments
- - [Grafana](https://grafana.com/): an open-source analytics & interactive visualization platform
- - [Loki](https://grafana.com/oss/loki/): an open-source log aggregation system inspired by Prometheus
- - [promtail](https://grafana.com/docs/loki/latest/clients/promtail/): an open-source agent to deliver the logs to Loki ]
- - [syslog-ng](https://www.syslog-ng.com/): an open-source log server implementing the syslog protocol 
- 
- ## Included Dashboards
-  - [MKTXP Exporter Dashboard](https://grafana.com/grafana/dashboards/13679-mikrotik-mktxp-exporter/): set as default Grafana dashboard
-  - [Mikrotik Loki Logs](https://grafana.com/grafana/dashboards/17139-mikrotik-loki-logs/): logging dashboard designed for this project
-  - [Grafana Internals](https://grafana.com/grafana/dashboards/3590-grafana-internals/): Grafana-related stats for system overivew, credited to [Grafana community](https://grafana.com/grafana/dashboards/)
-  - [Prometheus 2.0 Stats](https://grafana.com/grafana/dashboards/15489-prometheus-2-0-stats/): Prometheus-related stats for system overivew, credited to [Grafana community](https://grafana.com/grafana/dashboards/)
-
+1. Still in development
+1. development occured on a raspberry pi to start with (as that was what was available at the time). As a result, there were issues with getting Go to run in order to make use of the snmp-exporter snmp.yml generator. A seperate linux machine was used to do this.

@@ -1,12 +1,13 @@
 networks:
-  mktxp: {}
+  mktxp:
+    driver: bridge
 
 volumes:
   mktxp-logs:
     driver_opts:
        o: bind
        type: none
-       device: $PWD/syslog-ng/logs
+       device: /home/pi/Docker - Monitoring/mktxp-stack/syslog-ng/logs
   prometheus_storage: {}
   grafana_storage: {}
 
@@ -17,25 +18,39 @@ services:
     user: root
     volumes:
       - './mktxp/:/root/mktxp/'
+      - './syslog-ng/logs:/var/log/mktxp'
     networks:
-      mktxp: null
-    restart: unless-stopped  
+      - mktxp
+    depends_on:
+      - syslog-ng
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://localhost:3100/loki/api/v1/push"
+        # Try this: https://daniel.es/blog/centralize-and-visualize-docker-logs-in-grafana-with-loki/
+        # or this: https://abhiraj2001.medium.com/monitoring-docker-containers-with-grafana-loki-and-promtail-4302a9417c0d 
 
   grafana:
     container_name: grafana
+    
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
       GF_AUTH_BASIC_ENABLED: "false"
       GF_AUTH_DISABLE_LOGIN_FORM: "true"
       GF_USERS_DEFAULT_THEME: "light"
-      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/mikrotik/mikrotik_mktxp_exporter.json
+      #GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/mikrotik/mikrotik_mktxp_exporter.json
+      disableDeletion: "false"
+      updateIntervalSeconds: 10
     image: grafana/grafana:latest
     networks:
-      mktxp: null
+      - mktxp
     ports:
     - protocol: tcp
-      published: 3000
+      published: 80
       target: 3000
     restart: unless-stopped
     volumes:
@@ -48,7 +63,7 @@ services:
     container_name: loki
     image: grafana/loki:latest
     networks:
-      mktxp: null
+      - mktxp
     ports:
     - protocol: tcp
       published: 3100
@@ -64,10 +79,12 @@ services:
     - --storage.tsdb.retention.time=1y
     - --web.enable-admin-api
     - --web.enable-lifecycle
+    - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+    - '--web.console.templates=/usr/share/prometheus/consoles'
     container_name: prometheus
     image: prom/prometheus:latest
     networks:
-      mktxp: null
+      - mktxp
     ports:
     - published: 9090
       target: 9090
@@ -75,13 +92,15 @@ services:
     volumes:
     - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     - prometheus_storage:/prometheus
+      # Target files directory
+    - ./prometheus/targets:/etc/prometheus/targets:ro
 
   promtail:
     command: -config.file=/etc/promtail/promtail-config.yml
     container_name: promtail
     image: grafana/promtail:latest
     networks:
-      mktxp: null
+      - mktxp
     ports:
     - protocol: tcp
       published: 1514
@@ -93,6 +112,7 @@ services:
     volumes:
     - ./promtail/promtail-config-fs.yml:/etc/promtail/promtail-config.yml:ro
     - mktxp-logs:/var/log:ro
+    - /var/run/docker.sock:/var/run/docker.sock:ro
 
   syslog-ng:
     command: -edv
@@ -101,7 +121,7 @@ services:
     - promtail
     image: balabit/syslog-ng:latest
     networks:
-      mktxp: null
+      - mktxp
     ports:
     - protocol: udp
       published: 514
@@ -114,3 +134,41 @@ services:
     - ./syslog-ng/syslog-ng-fs.conf:/etc/syslog-ng/syslog-ng.conf:ro
     - mktxp-logs:/var/log/syslog-ng
 
+
+  snmp-exporter:
+    container_name: snmp-exporter
+    image: quay.io/prometheus/snmp-exporter:latest
+    ports:
+      - "9116:9116"
+      - "161:161/udp"
+    volumes:
+      - ./snmp-exporter:/etc/snmp-exporter
+    command: --config.file=/etc/snmp-exporter/snmpGenerated.yml
+    restart: unless-stopped
+    networks:
+      - mktxp
+
+
+  ssid-change-detector:
+      container_name: ssid-change-detector
+      build:
+        context: ./ssid-detector
+        dockerfile: Dockerfile
+      environment:
+        - PROMETHEUS_URL=http://prometheus:9090
+        - CHECK_INTERVAL=90  # in seconds
+        - LOOKBACK_INTERVAL=90 # In seconds
+      volumes:
+        - ./ssid-detector/data:/data
+      networks:
+        - mktxp
+      extra_hosts:
+        - "host.docker.internal:host-gateway"
+      restart: unless-stopped
+      depends_on:
+        - prometheus
+        - loki
+      logging:
+        driver: loki
+        options:
+          loki-url: "http://localhost:3100/loki/api/v1/push"
