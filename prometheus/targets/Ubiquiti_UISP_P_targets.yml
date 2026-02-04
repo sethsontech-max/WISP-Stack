@@ -1,0 +1,6 @@
+- targets:
+  - 10.10.10.49
+  labels:
+    site: "WaterTower"
+    device_type: "UISP_PSU"
+    role: "BatteryBackup"

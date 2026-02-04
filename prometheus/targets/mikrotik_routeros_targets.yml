@@ -1,0 +1,30 @@
+- targets:
+  - 172.30.8.11
+  - 172.30.8.12
+  - 172.30.8.13
+  - 172.30.8.14
+  - 172.30.8.15
+  - 172.30.8.16
+  - 172.30.8.20
+  - 172.30.8.21
+  labels:
+    site: "NemoTower"
+    device_type: "mikrotik"
+    role: "switches"
+
+
+- targets:
+  - 172.30.8.2
+  - 172.30.8.3
+  labels:
+    site: "NemoTower"
+    device_type: "mikrotik"
+    role: "routers"
+
+- targets:
+  - 172.30.8.22
+  - 172.30.8.17
+  labels:
+    site: "NemoTower"
+    device_type: "mikrotik"
+    role: "ColdSpares"

@@ -1,0 +1,15 @@
+- targets:
+  - 10.10.10.37
+  - 10.10.10.38
+  labels:
+    site: "Sass"
+    device_type: "AF60"
+    link_type: "backhaul"
+
+- targets:
+  - 10.10.10.39
+  - 10.10.10.40
+  labels:
+    site: "WaterTower"
+    device_type: "AF60"
+    link_type: "backhaul"

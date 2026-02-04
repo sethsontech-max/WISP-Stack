@@ -1,0 +1,6 @@
+- targets:
+  - 10.10.10.5
+  labels:
+    site: "WaterTower"
+    device_type: "UISP_Switch"
+    role: "switches"

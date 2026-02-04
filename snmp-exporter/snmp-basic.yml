@@ -1,0 +1,24 @@
+auths:
+  public_v2:
+    community: sontechwireless
+    security_level: noAuthNoPriv
+    auth_protocol: MD5
+    priv_protocol: DES
+    version: 2
+
+modules:
+  standard:
+    walk:
+      - 1.3.6.1.2.1.1        # System
+      - 1.3.6.1.2.1.2        # Interfaces
+      - 1.3.6.1.2.1.31       # IF-MIB (64-bit counters)
+    lookups:
+      - source_indexes: [ifIndex]
+        lookup: ifDescr
+      - source_indexes: [ifIndex]
+        lookup: ifName
+    overrides:
+      ifDescr:
+        type: DisplayString
+      ifName:
+        type: DisplayString
