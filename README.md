@@ -1,16 +1,18 @@
 ### Under Construction
 #### To Dos
-1. Update documentation and git
-    1. Document device IPs/target files and methods
-1. Add AF60 MicroTower Airtime graphs to main dashboard
-1. declare main/default grafana dashboard as nemo Dashboard
+1. ~~Update documentation and git~~
+    1. ~~Document device IPs/target files and methods~~
+1. ~~Add AF60 MicroTower Airtime graphs to main dashboard~~
+1. ~~declare main/default grafana dashboard as nemo Dashboard~~
 1. modify and clean up ubiquiti drilldown dashboard
+1. ~~fix Nemo Dashboard Waning log / device panel - currently shows incorrect values~~
+    1. fixed by deleting loki volume to remove old config data
 1. add logging to all docker containers
-1. fix Nemo Dashboard Waning log / device panel - currently shows incorrect values
 1. create Container log dashboard
 1. Add web based file editor container - provide means of adjusting targets easily with documentation
     1. code-server - VS code web browser is probably best option
 1. setup basic authentication checks - password logins - to prevent unwanted edits
+    1. ~~Grafana~~
 1. determine backup and transfer method
     1. Move stack to linux machine for more hardware resource
 1. investigate ways to have high avialability setup include mirrors of volume data storage
@@ -23,6 +25,8 @@
 1. Create program to perfrom IP scan and compare against all targets - allows for checking if unmonitored devices are present when compared to target list. As well as ping status of devices.
 1. Reduce SNMP metrics for Mikrotik devices as they are not needed with API metrics. SNMP is only needed for easy UP status indicator for grafana
 1. implement parrallel target processing for faster scraping time
+1. Create method to integrate target with sonar (bi-directionally?)
+1. investigate and implement dynmaic data sampling to allow faster dashboard loading
 
 ### Description
 This is a customized docker stack based on [MKTXP-Stack](https://github.com/akpw/mktxp-stack) designed for data collection and logging of network elements, primarily Ubiquiti AirMax/AF60 and MikroTik RouterOS devices. The primary use is for managing WISP deployment with vizualizations and dashboards not available in existing tools.
